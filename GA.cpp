@@ -1,6 +1,7 @@
 #include "StdAfx.h"
 #include "GA.h"
 #include <ctime>
+#include <algorithm>
 
 int g_nDistMin  = 30;
 int g_nDistDown = 30;
@@ -19,7 +20,7 @@ CGA::CGA(void)
     m_nYEnd   = 0;
 	m_pUI     = NULL;
 
-    m_nBestFitness = MAX_WIGHT;
+    m_nBestFitness = MAX_FITNESS;
     m_nBestGeneration = 0;
 
     srand(unsigned(time(0)));
@@ -49,7 +50,7 @@ CGA::CGA(int nPopSize,        // 种群规模
     m_nYBegin         = yRangeBegin;
     m_nYEnd           = yRangeEnd;
     m_graph           = graph;
-    m_nBestFitness    = MAX_WIGHT;
+    m_nBestFitness    = MAX_FITNESS;
     m_nBestGeneration = 0;
 	m_pUI             = pUI;
 
@@ -100,25 +101,172 @@ void CGA::Select()
 
 }
 
-void CGA::Cross()
-{
-    // 按照杂交概率，两两染色体配对，找一条方向向下的向量vector，对应直线方程：x = 0, 所以a = 1, b = 0, c = 0
-    // 染色体ch1, ch2
-    // 染色体ch1 ch2的每个点 分别计算其与向量vector的距离排序
-    
-    // 点到直线距距离 Dist(x1, x2) 排序
-    int nSize = m_vecChromosomes.size();
-    if ( nSize / 2 == 0 )
-    {
-        
-    }
 
+
+
+/************************************************************************/
+/*  按照杂交概率，两两染色体配对，找一条方向向下的向量vector，
+	* 对应直线方程：x = 0, 所以a = 1, b = 0, c = 0	染色体ch1, ch2
+	* 染色体ch1 ch2的每个点 分别计算其与向量vector的距离排序
+
+	* V1(10, 10) V2(10, 0)
+	* 每个染色体中的点V， 计算V1V向量在V1V2向量上的投影的大小，从小到大排序                                                                      */
+/************************************************************************/
+void CGA::Cross()
+{ 
+	// 种群中染色体个数
+    int nSize = m_vecChromosomes.size(); 
+	
+	// 先把当前种群拷贝出来
+	ChromosomeGroup groupCopy(m_vecChromosomes.begin(), m_vecChromosomes.end()); 
+
+	// 相邻染色体两两杂交
     for ( int i = 0; i < ( m_vecChromosomes.size() / 2 ) * 2; i += 2 )
     {
-        
-    }
-    
-    
+        float fRate = 0.0F;
+		if ( fRate <= m_fpCrossRate )
+		{ 
+			// 计算i 和 i + 1中 
+			// 记录该染色体中每个基因（点V）与给定向量(V1V2)， 向量V1V 在向量 V1V2上的投影的长度 和 该点V的索引
+			std::vector<Index2Dist> vecIndeies1; 
+			auto genes = m_vecChromosomes[ i ].GetGenes();
+
+			for (int index = 0; index < genes.size(); ++ index )
+			{
+				int nVX = genes[ index ].nX;
+				int nVY = genes[ index ].nY;
+
+				int nV1X = 10;
+				int nV1Y = 2000;
+
+				int nV2X = 10;
+				int nV2Y = -2000;
+
+				// 向量V1V(nVX - nV1X, nVY - nV1Y)
+				// 向量V1V2(nV2X - nV1X, nV1Y - nV2Y)
+				int x1 = nVX - nV1X;
+				int y1 = nVY - nV1Y;
+
+				int x2 = nV2X - nV1X;
+				int y2 = nV2Y - nV1Y; 
+
+
+				// 计算V1V与V1V2
+				float fArcCos = (x1 * x2 + y1 * y2) / 
+					( sqrt(1.0F * x1 * x1 + y1 * y1) * sqrt(1.0F * x2 * x2 + y2 * y2) );
+
+				// 投影 = |V1V| * cosX
+				float fLength = sqrt( 1.0F * x1 * x1 + y1 * y1 ) * fArcCos;
+
+				Index2Dist id;
+				id.nIndex = index;
+				id.fDist  = fLength;
+				id.gene = genes[ index ];
+				vecIndeies1.push_back(id);
+			} // for
+
+			// 按照fDist排序
+			std::sort(vecIndeies1.begin(), vecIndeies1.end());
+
+			//////////////////////////////////////////////////////////////////////////
+
+			// 记录该染色体中每个基因（点V）与给定向量(V1V2)， 向量V1V 在向量 V1V2上的投影的长度 和 该点V的索引
+			std::vector<Index2Dist> vecIndeies2; 
+			auto genes2 = m_vecChromosomes[ i + 1 ].GetGenes();
+
+			for (int index = 0; index < genes2.size(); ++ index )
+			{
+				int nVX = genes2[ index ].nX;
+				int nVY = genes2[ index ].nY;
+
+				int nV1X = 10;
+				int nV1Y = 2000;
+
+				int nV2X = 10;
+				int nV2Y = -2000;
+
+				// 向量V1V(nVX - nV1X, nVY - nV1Y)
+				// 向量V1V2(nV2X - nV1X, nV1Y - nV2Y)
+				int x1 = nVX - nV1X;
+				int y1 = nVY - nV1Y;
+
+				int x2 = nV2X - nV1X;
+				int y2 = nV2Y - nV1Y; 
+
+
+				// 计算V1V与V1V2
+				float fArcCos = (x1 * x2 + y1 * y2) / 
+					( sqrt(1.0F * x1 * x1 + y1 * y1) * sqrt(1.0F * x2 * x2 + y2 * y2) );
+
+				// 投影 = |V1V| * cosX
+				float fLength = sqrt( 1.0F * x1 * x1 + y1 * y1 ) * fArcCos;
+
+				Index2Dist id;
+				id.nIndex = index;
+				id.fDist  = fLength;
+				id.gene = genes2[ index ];
+				vecIndeies2.push_back(id);
+			} // for
+
+			// 按照dist从小到大排序
+			std::sort(vecIndeies2.begin(), vecIndeies2.end());
+
+
+
+			// 杂交后的两个新个体（染色体）
+			GeneGroup g1, g2; 
+
+			// 拷贝两个排序后的vec
+			std::vector<Index2Dist> vec1Copy(vecIndeies1.begin(), vecIndeies1.end());
+			std::vector<Index2Dist> vec2Copy(vecIndeies2.begin(), vecIndeies2.end()); 
+
+			int cnt1 = 0;
+			int cnt2 = vecIndeies2.size() - 1; 
+
+			for ( ; 
+				cnt1 < vecIndeies1.size() && 
+				cnt2 >= 0 && 
+				g1.size() < vecIndeies1.size(); 
+				++ cnt1, -- cnt2 )
+			{
+				auto it1 = std::find(g1.begin(), g1.end(), vecIndeies1[ cnt1 ].gene );
+				if ( it1 == g1.end() )
+				{
+					g1.push_back( vecIndeies1[ cnt1 ].gene );  
+					auto itTemp = std::find(vec1Copy.begin(), vec1Copy.end(), vecIndeies1[ cnt1 ].gene);
+					vec1Copy.erase(itTemp);
+				}
+				 
+
+				auto it2 = std::find(g1.begin(), g1.end(), vecIndeies2[ cnt2 ].gene ); 
+				if ( it2 == g1.end() )
+				{
+					g1.push_back( vecIndeies2[ cnt2 ].gene); 
+					auto itTemp = std::find(vec2Copy.begin(), vec2Copy.end(), vecIndeies2[ cnt2 ].gene);
+					vec2Copy.erase(itTemp);
+				}
+				 
+			} // for  
+
+			// 将vec1Copy 和 vec2Copy 中剩余的点放入g2
+			for ( auto iter = vec1Copy.begin(); iter != vec1Copy.end(); ++ iter )
+			{
+				g2.push_back(iter->gene);
+			}
+
+			for ( auto iter = vec2Copy.begin(); iter != vec2Copy.end(); ++ iter )
+			{
+				g2.push_back(iter->gene);
+			} 
+			
+			// 用新个体代替两个父个体
+		    // g1代替i位置染色体， g2代替i+1位置染色体
+			m_vecChromosomes[ i ].SetGenes(g1);
+			m_vecChromosomes[ i + 1 ].SetGenes(g2); 
+
+		} // if
+
+    } // for 
     
 }
 
@@ -149,7 +297,8 @@ void CGA::Draw()
 {
 	for ( int i = 0; i < m_vecChromosomes.size(); ++ i )
 	{
-		CChromosome::GeneGroup& genes =  m_vecChromosomes[ i ].GetGenes();
+		const GeneGroup& genes =  m_vecChromosomes[ i ].GetGenes(); 
+
 		int nSize = genes.size();
 		CPoint *pts = new CPoint[ nSize ]();
 		for ( int j = 0; j < nSize; ++ j )
@@ -167,30 +316,63 @@ void CGA::Draw()
 	}
 }
 
+void CGA::Draw(const CChromosome& chr)
+{ 
+	const GeneGroup& genes =  chr.GetGenes();
+ 	int nSize = genes.size();
+	CPoint *pts = new CPoint[ nSize ]();
+	for ( int j = 0; j < nSize; ++ j )
+	{
+		pts[ j ].x = genes[ j ].nX;
+		pts[ j ].y = genes[ j ].nY;
+	}
+	if ( m_pUI )
+	{
+		m_pUI->Draw(pts, nSize);
+	}
+
+	delete[] pts;
+	pts = NULL;
+	 
+}
+
 
 
 // 进化
 void CGA::Evolution()
 {
     int nCount = 0;
-    
+     
     while ( ++nCount <= m_nMaxGenerations )
-    { 
+    {  
         Select();
         Cross();
         Mut();
 
+		int nIndex = -1;
         // 计算该代的适应度，找出此种群中最优的解 
-        int nFitness = CalFitness();
+        int nMinFitness = CalFitness(nIndex);
         int nCurGeneration = IncreaseGeneration(); 
 
-        if ( nFitness < m_nBestFitness )
+        if ( nMinFitness < m_nBestFitness )
         {
-            m_nBestFitness = nFitness;
+            m_nBestFitness = nMinFitness;
             m_nBestGeneration = nCurGeneration;
         }
 
-		Draw();
+		// 记录当前种群、最小适应度、以及最小适应度是哪个染色体 
+		Generations curGeneration;
+		curGeneration.group = m_vecChromosomes;
+		curGeneration.nCurFitness = nMinFitness;
+		curGeneration.nCurMinIndex = nIndex;
+		//m_vecAllGenerations.push_back(curGeneration);
+		
+		if ( nIndex >= 0 )
+		{
+			//Sleep(1000 * 2); 
+			Draw(m_vecChromosomes[ nIndex ]); 
+			Sleep(1000 * 2);
+		} 
 
         // 如果符合最优条件，则退出
         if ( 0 )
@@ -201,13 +383,13 @@ void CGA::Evolution()
     } 
 
     int a = 0;
+	Finish();
 }
 
-int CGA::CalFitness()
+int CGA::CalFitness(int& nIndex)
 {
     // 计算群体中每个染色体的适应度
-    int nMin = MAX_WIGHT;
-    int nIndex = -1;
+    int nMin = MAX_FITNESS; 
     
     for ( int i = 0; i < m_vecChromosomes.size(); ++ i )
     {
@@ -255,6 +437,14 @@ void CGA::SetParam(
     m_nAngle    = nAngle;
 }
 
+void CGA::Finish()
+{
+	if ( m_pUI )
+	{
+		m_pUI->Finish();
+	}
+}
+
 
 
 
@@ -263,13 +453,13 @@ void CGA::SetParam(
 
 
 /************************************************************************/
-/*                                                                      */
+/*                 染色体                                               */
 /************************************************************************/
 
 CChromosome::CChromosome()
 {
-	m_nFitness = MAX_WIGHT;
-     
+	m_nFitness = MAX_FITNESS;
+	m_vecGenes.clear(); 
 }
 
 CChromosome::~CChromosome()
@@ -288,6 +478,11 @@ int CChromosome::CalFitness()
 
     // 任意两个顶点之间的距离相关
     float f1 = 0.0F;
+
+	if ( m_vecGenes.size() == 0 )
+	{
+		return MAX_FITNESS;
+	}
 
     for ( int i = 0; i < m_vecGenes.size() - 1; ++ i )
     {
@@ -407,7 +602,6 @@ int CChromosome::CalFitness()
 
         // 保存以该顶点为弧尾的弧
         std::vector<EdgeNode*> vecEdgeNodePtrs;
-
  
         EdgeNode* pEdge = pVertex->firstedge;
         while ( pEdge )
@@ -502,13 +696,27 @@ int CChromosome::Add( const Gene& gene )
     return m_vecGenes.size();
 }
 
+int CChromosome::SetGenes(const GeneGroup& genes)
+{
+	m_vecGenes.clear();
+	m_vecGenes.assign(genes.begin(), genes.end());
+
+	int nSize = this->Size();
+	return nSize;
+}
+
 int CChromosome::Dist( const Gene& gene1, const Gene& gene2 )
 {
     int nDist = sqrt( 1.0F * (gene1.nX - gene2.nX) * (gene1.nX - gene2.nX) + (gene1.nY - gene2.nY) * (gene1.nY - gene2.nY) );
     return nDist;
 }
 
-CChromosome::GeneGroup& CChromosome::GetGenes()  
+const GeneGroup& CChromosome::GetGenes()  const
 {
 	return m_vecGenes;
+}
+
+int CChromosome::Size() const
+{
+	return ( m_vecGenes.size() );
 }

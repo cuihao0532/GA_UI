@@ -57,6 +57,7 @@ CGA_GraphDlg::CGA_GraphDlg(CWnd* pParent /*=NULL*/)
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 	m_pPoints = NULL;
 	m_nNumPoints = 0;
+	m_hThread    = INVALID_HANDLE_VALUE;
 }
 
 void CGA_GraphDlg::DoDataExchange(CDataExchange* pDX)
@@ -108,7 +109,7 @@ BOOL CGA_GraphDlg::OnInitDialog()
 	int nHeight = GetSystemMetrics(SM_CYSCREEN);
 	MoveWindow(0, 0, nWidth, nHeight, FALSE);
 
-	GetDlgItem(IDC_BTN_BEGIN)->MoveWindow(10, 30, 30, 30);
+	GetDlgItem(IDC_BTN_BEGIN)->MoveWindow(8, 30, 50, 30);
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
@@ -205,8 +206,8 @@ void CGA_GraphDlg::InitGA()
 {
 	g_graph.CreateGraph();
 
-	int nPopSize					= 1;
-	int nMaxGenerations				= 1;
+	int nPopSize					= 10;
+	int nMaxGenerations				= 10;
 	float fpSelectRate				= 1.0F;
 	float fpCrossRate				= 0.55F;
 	float fpMutRate					= 0.015F;
@@ -236,8 +237,10 @@ void CGA_GraphDlg::Draw()
 	COLORREF cr = RGB(255, 0, 0);
 	for ( int i = 0; i < m_nNumPoints; ++ i )
 	{
+		CString strText;
+		strText.Format(TEXT("(%d, %d)"), m_pPoints[ i ].x, m_pPoints[ i ].y);
 		pDC->SetPixel(m_pPoints[ i ], cr);
-		pDC->TextOut(m_pPoints[ i ].x, m_pPoints[ i ].y, CString(TEXT("hello")));
+		pDC->TextOut(m_pPoints[ i ].x, m_pPoints[ i ].y, strText);
 	} 
 
 	ReleaseDC(pDC); 
@@ -255,10 +258,59 @@ void CGA_GraphDlg::Draw(POINT* pts, int nNum)
 	m_pPoints = new POINT[ nNum ]();
 	memcpy_s(m_pPoints, nNum * sizeof(POINT), pts, nNum * sizeof(POINT));
 
+	CString strLog;
+	strLog.Format(TEXT("Points num = %d: "), nNum);
+	for ( int i = 0; i < nNum; ++ i )
+	{
+		CString strTemp;
+		strTemp.Format(TEXT("(%d, %d)"), m_pPoints[ i ].x, m_pPoints[ i ].y);
+		if ( i < nNum - 1) 
+			strTemp += CString(TEXT(", ")); 
+
+		strLog += strTemp;		
+	}
+
+	afxDump << strLog;
+
 	Invalidate();
 }
 
 void CGA_GraphDlg::OnBnClickedBtnBegin()
 {
-	InitGA();
+	if ( INVALID_HANDLE_VALUE == m_hThread || NULL == m_hThread )
+	{
+		m_hThread = (HANDLE)_beginthreadex(
+			NULL,
+			0,
+			WorkThread,
+			this,
+			0,
+			NULL);
+
+	}
+
+	if ( NULL != m_hThread && INVALID_HANDLE_VALUE != m_hThread )
+	{
+		GetDlgItem(IDC_BTN_BEGIN)->EnableWindow(FALSE); 
+	}
+}
+
+void CGA_GraphDlg::Finish()
+{
+	CloseHandle(m_hThread);
+	m_hThread = NULL;
+	GetDlgItem(IDC_BTN_BEGIN)->EnableWindow(TRUE);	
+}
+
+ 
+
+
+unsigned int __stdcall WorkThread(void* p)
+{
+	if ( !p ) return 0;
+
+	CGA_GraphDlg* pDlg = (CGA_GraphDlg*)( p ); 
+	pDlg->InitGA();
+
+	return 0;
 }

@@ -41,12 +41,14 @@ protected:
 protected:
 	void DrawCoordinate();
 	void InitGA();
-	void Begin();
-
+	void Begin(); 
 	void Draw();
+	HANDLE m_hThread;
+	friend unsigned int __stdcall WorkThread(void* p);
 
 public:
-	void Draw(POINT* pts, int nNum);
+	void Draw(POINT* pts, int nNum); 
+	void Finish();
 
 	afx_msg void OnBnClickedBtnBegin();
 };

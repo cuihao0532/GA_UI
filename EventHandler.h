@@ -5,4 +5,5 @@ __interface IUIInterface
 {
 public:
 	void Draw(POINT* pts, int nNum);
+	void Finish();
 };
