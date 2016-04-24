@@ -3,9 +3,10 @@
 #include <ctime>
 #include <algorithm>
 
-int g_nDistMin  = 30;
-int g_nDistDown = 30;
-int g_nAngle    = 30;
+
+extern int g_nDistMin;
+extern int g_nDistDown;
+extern int g_nAngle;
 
 extern CGraph g_graph;
 
@@ -21,7 +22,7 @@ CGA::CGA(void)
 	m_pUI     = NULL;
 
     m_nBestFitness = MAX_FITNESS;
-    m_nBestGeneration = 0;
+    m_nBestGeneration = -1;
 
     srand(unsigned(time(0)));
 }
@@ -51,7 +52,7 @@ CGA::CGA(int nPopSize,        // 种群规模
     m_nYEnd           = yRangeEnd;
     m_graph           = graph;
     m_nBestFitness    = MAX_FITNESS;
-    m_nBestGeneration = 0;
+    m_nBestGeneration = -1;
 	m_pUI             = pUI;
 
     m_vecChromosomes.clear();  
@@ -123,7 +124,12 @@ void CGA::Cross()
 	// 相邻染色体两两杂交
     for ( int i = 0; i < ( m_vecChromosomes.size() / 2 ) * 2; i += 2 )
     {
+#if 0
         float fRate = 0.0F;
+#else
+		float fRate = Randf();
+#endif
+
 		if ( fRate <= m_fpCrossRate )
 		{ 
 			// 计算i 和 i + 1中 
@@ -179,11 +185,11 @@ void CGA::Cross()
 				int nVX = genes2[ index ].nX;
 				int nVY = genes2[ index ].nY;
 
-				int nV1X = 10;
-				int nV1Y = 2000;
+				int nV1X = 100;
+				int nV1Y = 1000;
 
-				int nV2X = 10;
-				int nV2Y = -2000;
+				int nV2X = 100;
+				int nV2Y = -1000;
 
 				// 向量V1V(nVX - nV1X, nVY - nV1Y)
 				// 向量V1V2(nV2X - nV1X, nV1Y - nV2Y)
@@ -234,7 +240,10 @@ void CGA::Cross()
 				{
 					g1.push_back( vecIndeies1[ cnt1 ].gene );  
 					auto itTemp = std::find(vec1Copy.begin(), vec1Copy.end(), vecIndeies1[ cnt1 ].gene);
-					vec1Copy.erase(itTemp);
+					if ( itTemp != vec1Copy.end() )
+					{
+						vec1Copy.erase(itTemp);
+					}
 				}
 				 
 
@@ -243,7 +252,10 @@ void CGA::Cross()
 				{
 					g1.push_back( vecIndeies2[ cnt2 ].gene); 
 					auto itTemp = std::find(vec2Copy.begin(), vec2Copy.end(), vecIndeies2[ cnt2 ].gene);
-					vec2Copy.erase(itTemp);
+					if ( itTemp != vec2Copy.end() )
+					{
+						vec2Copy.erase(itTemp);
+					}
 				}
 				 
 			} // for  
@@ -270,9 +282,28 @@ void CGA::Cross()
     
 }
 
+// 变异
 void CGA::Mut()
-{
+{ 
+	for ( int i = 0; i < m_vecChromosomes.size(); ++ i )
+	{
+		float fRate = Randf();
+		if ( fRate <= m_fpMutRate )
+		{
+			// 为每个染色体产生一个随机的变异位置（基因，哪个点）
+			// 为该基因（点）随机生成一个坐标，来代替之前的基因
 
+			// 随机位置的范围[0, 点个数 - 1]
+			int nRandPos = Rand(0, g_graph.graph.numVertexes - 1);
+			int nRandX = Rand(m_nXBegin, m_nXEnd);
+			int nRandY = Rand(m_nYBegin, m_nYEnd);
+
+			Gene gene;
+			gene.nX = nRandX;
+			gene.nY = nRandY;
+			m_vecChromosomes[ i ].SetGene(nRandPos, gene); 
+		}
+	}  
 }
 
 void CGA::Output() const
@@ -308,7 +339,7 @@ void CGA::Draw()
 		}
 		if ( m_pUI )
 		{
-			m_pUI->Draw(pts, nSize);
+			m_pUI->Draw(pts, nSize, NULL, 0);
 		}
 
 		delete[] pts;
@@ -318,8 +349,24 @@ void CGA::Draw()
 
 void CGA::Draw(const CChromosome& chr)
 { 
-	const GeneGroup& genes =  chr.GetGenes();
- 	int nSize = genes.size();
+	const GeneGroup& genes =  chr.GetGenes(); 
+	int nSize = genes.size();
+
+	ArcNode arcs[ MAX_VERTEX * ( MAX_VERTEX - 1) ]; 
+	// 获取所有弧的弧尾 弧头的坐标
+	for ( int i = 0; i < g_graph.graph.numEdges; ++ i )
+	{
+		int nTail = g_graph.edgeNodes[i].tail;
+		int nHead = g_graph.edgeNodes[i].adjvex;
+
+		CPoint ptFrom(genes[ nTail ].nX, genes[ nTail ].nY);
+		CPoint ptTo(genes[ nHead ].nX, genes[ nHead ].nY);
+
+		arcs[ i ].ptFrom = ptFrom;
+		arcs[ i ].ptTo   = ptTo;
+
+	} // for
+
 	CPoint *pts = new CPoint[ nSize ]();
 	for ( int j = 0; j < nSize; ++ j )
 	{
@@ -328,11 +375,11 @@ void CGA::Draw(const CChromosome& chr)
 	}
 	if ( m_pUI )
 	{
-		m_pUI->Draw(pts, nSize);
+		m_pUI->Draw(pts, nSize, arcs, g_graph.graph.numEdges);
 	}
 
 	delete[] pts;
-	pts = NULL;
+	pts = NULL;	  
 	 
 }
 
@@ -365,24 +412,27 @@ void CGA::Evolution()
 		curGeneration.group = m_vecChromosomes;
 		curGeneration.nCurFitness = nMinFitness;
 		curGeneration.nCurMinIndex = nIndex;
-		//m_vecAllGenerations.push_back(curGeneration);
+		m_vecAllGenerations.push_back(curGeneration);
 		
 		if ( nIndex >= 0 )
-		{
-			//Sleep(1000 * 2); 
+		{ 
 			Draw(m_vecChromosomes[ nIndex ]); 
 			Sleep(1000 * 2);
 		} 
 
-        // 如果符合最优条件，则退出
-        if ( 0 )
-        {
-            break;
-        }
-
+         
     } 
 
-    int a = 0;
+	// 找到所有代中 适应度最小 所在的代 最小的个体
+	if ( m_nBestGeneration >= 1 )
+	{
+		int nIndex = m_vecAllGenerations[ m_nBestGeneration - 1].nCurMinIndex;
+		Draw( m_vecAllGenerations[ m_nBestGeneration - 1 ].group[ nIndex ]); 
+
+		// 图中所有弧
+
+	} 
+
 	Finish();
 }
 
@@ -405,7 +455,7 @@ int CGA::CalFitness(int& nIndex)
     return nMin;
 }
 
-int CGA::Rand( int begin, int end )
+int CGA::Rand( int begin, int end ) const
 { 
     int nMin = begin;
     int nMax = end;
@@ -420,6 +470,18 @@ int CGA::Rand( int begin, int end )
      
     return nVal;
 }
+
+
+float CGA::Randf() const
+{
+	int nBegin = 0;
+	int nEnd   = 100000;
+	int nVal = Rand(nBegin, nEnd);
+	float fVal = nVal * 0.00001F;
+	
+	return fVal;	
+}
+
 
 int CGA::Add( const CChromosome& chr )
 {
@@ -495,7 +557,8 @@ int CChromosome::CalFitness()
 
     // 每条弧的弧头与弧尾的Y坐标的距离 相关
     float f2 = 0.0F;
-    for ( int i = 0; i < g_graph.graph.numVertexes; ++ i )
+    //for ( int i = 0; i < g_graph.graph.numVertexes; ++ i )
+    for ( int i = 0; i < g_graph.graph.numEdges; ++ i ) 
     {
         int nTail = g_graph.edgeNodes[i].tail;
         int nHead = g_graph.edgeNodes[i].adjvex;
@@ -511,7 +574,8 @@ int CChromosome::CalFitness()
 
     // 每条弧的长度 相关
     float f3 = 0.0F;
-    for ( int i = 0; i < g_graph.graph.numVertexes; ++ i )
+    //for ( int i = 0; i < g_graph.graph.numVertexes; ++ i )
+    for ( int i = 0; i < g_graph.graph.numEdges; ++ i ) 
     {
         int nTail = g_graph.edgeNodes[i].tail;
         int nHead = g_graph.edgeNodes[i].adjvex;
@@ -527,7 +591,6 @@ int CChromosome::CalFitness()
     // 计算每个顶点到每条边的距离
     for ( int i = 0; i < g_graph.graph.numVertexes; ++ i )
     {
-
         for ( int index = 0; index < g_graph.graph.numEdges; ++ index )
         {
             // 顶点坐标 A
@@ -584,7 +647,7 @@ int CChromosome::CalFitness()
                 b = -1;
 
                 // 计算顶点到直线的距离
-                float fDist = (a * nX + b * nY + c) / (a * a + b * b); 
+                float fDist = (a * nX + b * nY + c) / sqrt(a * a + b * b); 
 
                 f4 += fDist;
             }
@@ -719,4 +782,12 @@ const GeneGroup& CChromosome::GetGenes()  const
 int CChromosome::Size() const
 {
 	return ( m_vecGenes.size() );
+}
+
+bool CChromosome::SetGene(int nPos, const Gene& gene)
+{
+	if ( nPos < 0 || nPos >= Size() ) return false; 
+
+	m_vecGenes[ nPos ] = gene;
+	return true;
 }

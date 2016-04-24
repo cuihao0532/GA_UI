@@ -48,6 +48,9 @@
     <ClInclude Include="EventHandler.h">
       <Filter>头文件</Filter>
     </ClInclude>
+    <ClInclude Include="DataType.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="GA_Graph.cpp">

@@ -1,17 +1,22 @@
 
 #include "EventHandler.h"
 #include <vector>
+#include <map>
+#include <algorithm>
 #include <iostream>
 #include "Graph.h"
+#include "DataType.h"
 using std::cout;
 using std::endl;
 using std::vector;
+using std::map;
+
 
 
 #pragma once
 
 // 最大（无效）适应度
-#define  MAX_FITNESS  99999999999
+#define  MAX_FITNESS  999999
 #define  PI           3.14159265358979323846
 
 // 基因（一个坐标对）
@@ -92,6 +97,7 @@ public:
     
     int Dist(const Gene& gene1, const Gene& gene2); // 计算两个两个基因（点）之间的距离
 	const GeneGroup& GetGenes() const;              // 返回该染色的基因组
+	bool  SetGene(int nPos, const Gene& gene);      // 修改nPos位置的基因
 	int Size() const; 
 
 protected:
@@ -105,7 +111,12 @@ typedef std::vector<CChromosome> ChromosomeGroup;
 typedef struct _tagGenerations
 {
 public:
-	_tagGenerations() { memset(this, 0, sizeof(*this)); }
+	_tagGenerations() 
+	{
+		nCurMinIndex = -1;
+		nCurMinIndex = MAX_FITNESS;
+	}
+
 	int nCurMinIndex;
 	int nCurFitness;
 	ChromosomeGroup group;
@@ -191,7 +202,8 @@ protected:
 	void  Select();							// 选择
 	void  Cross();							// 交叉
 	void  Mut();							// 变异
-    int   Rand(int begin, int end);			// 生成随机数
+    int   Rand(int begin, int end) const;	// 生成随机数
+	float Randf() const;                    // 产生[0, 1]之间的随机浮点数
 	 
 
     int  Add(const CChromosome& chr);       // 添加染色体
